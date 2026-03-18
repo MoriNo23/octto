@@ -12,6 +12,10 @@ const MAX_SUGGESTION_DISTANCE = 3;
 
 const ProjectFragmentsSchema = v.record(v.string(), v.array(v.string()));
 
+export interface FragmentInjectorContext {
+  projectDir: string;
+}
+
 /**
  * Format fragments array as an XML block to prepend to agent prompts.
  */
@@ -92,21 +96,6 @@ export function levenshteinDistance(a: string, b: string): number {
 }
 /* eslint-enable max-depth, sonarjs/cognitive-complexity */
 
-function findClosestAgent(name: string): string | undefined {
-  let closest: string | undefined;
-  let minDistance = Infinity;
-
-  for (const validName of VALID_AGENT_NAMES) {
-    const distance = levenshteinDistance(name, validName);
-    if (distance < minDistance && distance <= MAX_SUGGESTION_DISTANCE) {
-      minDistance = distance;
-      closest = validName;
-    }
-  }
-
-  return closest;
-}
-
 export function warnUnknownAgents(fragments: Record<string, string[]> | undefined): void {
   if (!fragments) return;
 
@@ -126,10 +115,6 @@ export function warnUnknownAgents(fragments: Record<string, string[]> | undefine
   }
 }
 
-export interface FragmentInjectorContext {
-  projectDir: string;
-}
-
 export async function createFragmentInjector(
   ctx: FragmentInjectorContext,
   globalFragments: FragmentsRecord,
@@ -145,4 +130,19 @@ export async function createFragmentInjector(
 
 export function getAgentSystemPromptPrefix(fragments: Record<string, string[]>, agentName: string): string {
   return formatFragmentsBlock(fragments[agentName]);
+}
+
+function findClosestAgent(name: string): string | undefined {
+  let closest: string | undefined;
+  let minDistance = Infinity;
+
+  for (const validName of VALID_AGENT_NAMES) {
+    const distance = levenshteinDistance(name, validName);
+    if (distance < minDistance && distance <= MAX_SUGGESTION_DISTANCE) {
+      minDistance = distance;
+      closest = validName;
+    }
+  }
+
+  return closest;
 }

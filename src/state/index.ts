@@ -5,7 +5,6 @@ export { createStateStore } from "./store";
 export type {
   BrainstormState,
   Branch,
-  BranchProbeResult,
   BranchQuestion,
   BranchStatus,
   CreateBranchInput,

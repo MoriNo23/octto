@@ -160,9 +160,9 @@ export function createQuestionTools(sessions: SessionStore): OcttoTools {
     confirm: buildConfirm(createTool),
     rank: buildRank(createTool),
     rate: buildRate(createTool),
-    ...createInputTools(sessions),
-    ...createPresentationTools(sessions),
-    ...createQuickTools(sessions),
+    ...createInputTools(createTool),
+    ...createPresentationTools(createTool),
+    ...createQuickTools(createTool),
   };
 }
 
@@ -287,8 +287,7 @@ function buildAskCode(createTool: ToolFactory): OcttoTool {
   });
 }
 
-function createInputTools(sessions: SessionStore): OcttoTools {
-  const createTool = createQuestionToolFactory(sessions);
+function createInputTools(createTool: ToolFactory): OcttoTools {
   return {
     ask_text: buildAskText(createTool),
     ask_image: buildAskImage(createTool),
@@ -426,8 +425,7 @@ function buildReviewSection(createTool: ToolFactory): OcttoTool {
   });
 }
 
-function createPresentationTools(sessions: SessionStore): OcttoTools {
-  const createTool = createQuestionToolFactory(sessions);
+function createPresentationTools(createTool: ToolFactory): OcttoTools {
   return {
     show_diff: buildShowDiff(createTool),
     show_plan: buildShowPlan(createTool),
@@ -520,8 +518,7 @@ Response format: { value: number }`,
   });
 }
 
-function createQuickTools(sessions: SessionStore): OcttoTools {
-  const createTool = createQuestionToolFactory(sessions);
+function createQuickTools(createTool: ToolFactory): OcttoTools {
   return {
     thumbs: buildThumbs(createTool),
     emoji_react: buildEmojiReact(createTool),

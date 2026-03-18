@@ -14,7 +14,7 @@ interface QuestionToolConfig<T> {
   toConfig: (args: T) => BaseConfig;
 }
 
-export type QuestionToolBuilder = <T extends { session_id: string }>(config: QuestionToolConfig<T>) => OcttoTool;
+type QuestionToolBuilder = <T extends { session_id: string }>(config: QuestionToolConfig<T>) => OcttoTool;
 
 export function createQuestionToolFactory(sessions: SessionStore): QuestionToolBuilder {
   return function createQuestionTool<T extends { session_id: string }>(config: QuestionToolConfig<T>): OcttoTool {

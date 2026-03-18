@@ -38,13 +38,3 @@ export interface CreateBranchInput {
   id: string;
   scope: string;
 }
-
-export interface BranchProbeResult {
-  done: boolean;
-  reason: string;
-  finding?: string;
-  question?: {
-    type: QuestionType;
-    config: BaseConfig;
-  };
-}

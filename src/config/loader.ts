@@ -11,6 +11,12 @@ import { AgentOverrideSchema, type Fragments, MAX_PORT, type OcttoConfig, OcttoC
 
 export type { AgentOverride, Fragments, OcttoConfig } from "./schema";
 
+export interface CustomConfig {
+  agents: Record<AgentName, AgentConfig>;
+  port: number;
+  fragments: Fragments;
+}
+
 const OCTTO_PORT_ENV = "OCTTO_PORT";
 const DEFAULT_PORT = 0;
 
@@ -109,12 +115,6 @@ async function load(configDir?: string): Promise<OcttoConfig | null> {
   }
 
   return salvageValidAgents(parsed);
-}
-
-export interface CustomConfig {
-  agents: Record<AgentName, AgentConfig>;
-  port: number;
-  fragments: Fragments;
 }
 
 /**
