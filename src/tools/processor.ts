@@ -1,19 +1,24 @@
-// src/tools/processor.ts
+import * as v from "valibot";
 
 import { AGENTS } from "@/agents";
-import type { Answer, QuestionType, SessionStore } from "@/session";
+import type { Answer, SessionStore } from "@/session";
+import { QUESTION_TYPES } from "@/session";
 import { BRANCH_STATUSES, type BrainstormState, type StateStore } from "@/state";
 
 import type { OpencodeClient } from "./types";
 
-interface ProbeResult {
-  done: boolean;
-  finding?: string;
-  question?: {
-    type: QuestionType;
-    config: Record<string, unknown>;
-  };
-}
+const ProbeResultSchema = v.object({
+  done: v.boolean(),
+  finding: v.optional(v.string()),
+  question: v.optional(
+    v.object({
+      type: v.picklist(QUESTION_TYPES),
+      config: v.record(v.string(), v.unknown()),
+    }),
+  ),
+});
+
+type ProbeResult = v.InferOutput<typeof ProbeResultSchema>;
 
 function formatBranchQuestions(questions: { type: string; text: string; answer?: unknown }[]): string[] {
   const lines: string[] = [];
@@ -60,19 +65,40 @@ function formatBranchContext(state: BrainstormState, branchId: string): string {
   return lines.join("\n");
 }
 
+function parseProbeResponse(parts: { type: string; [key: string]: unknown }[]): ProbeResult {
+  const responseText = parts
+    .filter(
+      (part): part is typeof part & { text: string } =>
+        part.type === "text" && "text" in part && typeof part.text === "string",
+    )
+    .map((part) => part.text)
+    .join("");
+
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    return { done: true, finding: "Could not parse probe response" };
+  }
+
+  const parsed = v.safeParse(ProbeResultSchema, JSON.parse(jsonMatch[0]));
+  if (!parsed.success) {
+    return { done: true, finding: "Could not validate probe response" };
+  }
+  return parsed.output;
+}
+
 async function runProbeAgent(client: OpencodeClient, state: BrainstormState, branchId: string): Promise<ProbeResult> {
-  const sessionResult = await client.session.create({
+  const session = await client.session.create({
     body: { title: `probe-${branchId}` },
   });
 
-  if (!sessionResult.data) {
+  if (!session.data) {
     throw new Error("Failed to create probe session");
   }
 
-  const probeSessionId = sessionResult.data.id;
+  const probeSessionId = session.data.id;
 
   try {
-    const promptResult = await client.session.prompt({
+    const prompt = await client.session.prompt({
       path: { id: probeSessionId },
       body: {
         agent: AGENTS.probe,
@@ -81,23 +107,15 @@ async function runProbeAgent(client: OpencodeClient, state: BrainstormState, bra
       },
     });
 
-    if (!promptResult.data) {
+    if (!prompt.data) {
       throw new Error("Failed to get probe response");
     }
 
-    const responseText = promptResult.data.parts
-      .filter((part) => part.type === "text" && "text" in part)
-      .map((part) => (part as { text: string }).text)
-      .join("");
-
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return { done: true, finding: "Could not parse probe response" };
-    }
-
-    return JSON.parse(jsonMatch[0]) as ProbeResult;
+    return parseProbeResponse(prompt.data.parts);
   } finally {
-    await client.session.delete({ path: { id: probeSessionId } }).catch(() => {});
+    await client.session.delete({ path: { id: probeSessionId } }).catch((_error: unknown) => {
+      /* cleanup errors are non-fatal */
+    });
   }
 }
 
@@ -109,7 +127,7 @@ function findBranchForQuestion(state: BrainstormState, questionId: string): stri
 }
 
 async function handleProbeResult(
-  result: ProbeResult,
+  probe: ProbeResult,
   stateStore: StateStore,
   sessions: SessionStore,
   sessionId: string,
@@ -117,29 +135,32 @@ async function handleProbeResult(
   branchId: string,
   branchScope: string,
 ): Promise<void> {
-  if (result.done) {
-    await stateStore.completeBranch(sessionId, branchId, result.finding || "No finding");
+  if (probe.done) {
+    await stateStore.completeBranch(sessionId, branchId, probe.finding || "No finding");
     return;
   }
 
-  if (!result.question) return;
+  if (!probe.question) return;
 
-  const config = result.question.config as { question?: string; context?: string };
-  const questionText = config.question ?? "Follow-up question";
+  const rawQuestion = probe.question.config.question;
+  const rawContext = probe.question.config.context;
+  const questionText = typeof rawQuestion === "string" ? rawQuestion : "Follow-up question";
+  const contextText = typeof rawContext === "string" ? rawContext : "";
   const configWithContext = {
-    ...config,
-    context: `[${branchScope}] ${config.context ?? ""}`.trim(),
+    ...probe.question.config,
+    question: questionText,
+    context: `[${branchScope}] ${contextText}`.trim(),
   };
 
   const { question_id: newQuestionId } = sessions.pushQuestion(
     browserSessionId,
-    result.question.type,
+    probe.question.type,
     configWithContext,
   );
 
   await stateStore.addQuestionToBranch(sessionId, branchId, {
     id: newQuestionId,
-    type: result.question.type,
+    type: probe.question.type,
     text: questionText,
     config: configWithContext,
   });
@@ -174,6 +195,6 @@ export async function processAnswer(
   const branch = updatedState.branches[branchId];
   if (!branch || branch.status === BRANCH_STATUSES.DONE) return;
 
-  const result = await runProbeAgent(client, updatedState, branchId);
-  await handleProbeResult(result, stateStore, sessions, sessionId, browserSessionId, branchId, branch.scope);
+  const probe = await runProbeAgent(client, updatedState, branchId);
+  await handleProbeResult(probe, stateStore, sessions, sessionId, browserSessionId, branchId, branch.scope);
 }

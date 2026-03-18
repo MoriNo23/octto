@@ -1,5 +1,3 @@
-// src/index.ts
-
 import type { Plugin } from "@opencode-ai/plugin";
 
 import { AGENTS, agents } from "@/agents";
@@ -12,8 +10,8 @@ import type { OcttoTool } from "@/tools/types";
 function wrapWithTracking(tool: OcttoTool, tracked: Map<string, Set<string>>): void {
   const originalExecute = tool.execute;
   tool.execute = async (args, toolCtx) => {
-    const result = await originalExecute(args, toolCtx);
-    const match = result.match(/ses_[a-z0-9]+/);
+    const executeOutput = await originalExecute(args, toolCtx);
+    const match = executeOutput.match(/ses_[a-z0-9]+/);
 
     if (match && toolCtx.sessionID) {
       if (!tracked.has(toolCtx.sessionID)) {
@@ -22,7 +20,7 @@ function wrapWithTracking(tool: OcttoTool, tracked: Map<string, Set<string>>): v
       tracked.get(toolCtx.sessionID)?.add(match[0]);
     }
 
-    return result;
+    return executeOutput;
   };
 }
 
@@ -54,8 +52,7 @@ const Octto: Plugin = async ({ client, directory }) => {
     event: async ({ event }) => {
       if (event.type !== "session.deleted") return;
 
-      const props = event.properties as { info?: { id?: string } };
-      const id = props?.info?.id;
+      const id = event.properties.info.id;
       const octtoSessions = id && tracked.get(id);
 
       if (octtoSessions) {

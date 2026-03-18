@@ -1,5 +1,3 @@
-// src/tools/types.ts
-
 import type { ToolContext } from "@opencode-ai/plugin/tool";
 import type { createOpencodeClient } from "@opencode-ai/sdk";
 

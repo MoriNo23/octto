@@ -1,22 +1,23 @@
 // tests/state/persistence.test.ts
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { createStatePersistence, type StatePersistence } from "../../src/state/persistence";
 import type { BrainstormState } from "../../src/state/types";
 
-const TEST_DIR = "/tmp/octto-test";
-
 describe("createStatePersistence", () => {
   let persistence: StatePersistence;
+  let testDir: string;
 
   beforeEach(() => {
-    rmSync(TEST_DIR, { recursive: true, force: true });
-    persistence = createStatePersistence(TEST_DIR);
+    testDir = mkdtempSync(join(tmpdir(), "octto-persistence-test-"));
+    persistence = createStatePersistence(testDir);
   });
 
   afterEach(() => {
-    rmSync(TEST_DIR, { recursive: true, force: true });
+    rmSync(testDir, { recursive: true, force: true });
   });
 
   describe("save and load", () => {
@@ -67,7 +68,7 @@ describe("createStatePersistence", () => {
 
       await persistence.save(state);
 
-      expect(existsSync(TEST_DIR)).toBe(true);
+      expect(existsSync(testDir)).toBe(true);
     });
   });
 

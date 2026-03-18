@@ -1,4 +1,3 @@
-// src/state/types.ts
 import type { Answer, BaseConfig, QuestionType } from "@/session";
 
 export const BRANCH_STATUSES = {

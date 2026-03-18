@@ -1,26 +1,13 @@
-// src/tools/extractor.ts
-// Utility functions for extracting answer summaries
-
-import type {
-  Answer,
-  AskCodeAnswer,
-  AskTextAnswer,
-  ConfirmAnswer,
-  EmojiReactAnswer,
-  PickManyAnswer,
-  PickOneAnswer,
-  QuestionType,
-  RankAnswer,
-  RateAnswer,
-  ReviewAnswer,
-  ShowOptionsAnswer,
-  SliderAnswer,
-  ThumbsAnswer,
-} from "@/session";
+import type { Answer, QuestionAnswers, QuestionType } from "@/session";
 import { QUESTIONS } from "@/session";
 
 const MAX_TEXT_LENGTH = 100;
 const MAX_DISPLAYED_RATINGS = 3;
+
+function typedAnswer<T extends QuestionType>(_type: T, answer: Answer): QuestionAnswers[T] {
+  // _type is used only for type inference; the switch in extractAnswerSummary provides runtime safety
+  return answer as QuestionAnswers[T];
+}
 
 function truncateText(text: string): string {
   return text.length > MAX_TEXT_LENGTH ? `${text.substring(0, MAX_TEXT_LENGTH)}...` : text;
@@ -30,45 +17,45 @@ function truncateText(text: string): string {
 export function extractAnswerSummary(type: QuestionType, answer: Answer): string {
   switch (type) {
     case QUESTIONS.PICK_ONE:
-      return (answer as PickOneAnswer).selected;
+      return typedAnswer(QUESTIONS.PICK_ONE, answer).selected;
 
     case QUESTIONS.PICK_MANY:
-      return (answer as PickManyAnswer).selected.join(", ");
+      return typedAnswer(QUESTIONS.PICK_MANY, answer).selected.join(", ");
 
     case QUESTIONS.CONFIRM:
-      return (answer as ConfirmAnswer).choice;
+      return typedAnswer(QUESTIONS.CONFIRM, answer).choice;
 
     case QUESTIONS.THUMBS:
-      return (answer as ThumbsAnswer).choice;
+      return typedAnswer(QUESTIONS.THUMBS, answer).choice;
 
     case QUESTIONS.EMOJI_REACT:
-      return (answer as EmojiReactAnswer).emoji;
+      return typedAnswer(QUESTIONS.EMOJI_REACT, answer).emoji;
 
     case QUESTIONS.ASK_TEXT:
-      return truncateText((answer as AskTextAnswer).text);
+      return truncateText(typedAnswer(QUESTIONS.ASK_TEXT, answer).text);
 
     case QUESTIONS.SLIDER:
-      return String((answer as SliderAnswer).value);
+      return String(typedAnswer(QUESTIONS.SLIDER, answer).value);
 
     case QUESTIONS.RANK: {
-      const rankAnswer = answer as RankAnswer;
-      const sorted = [...rankAnswer.ranking].sort((a, b) => a.rank - b.rank);
+      const ranked = typedAnswer(QUESTIONS.RANK, answer);
+      const sorted = [...ranked.ranking].sort((a, b) => a.rank - b.rank);
       return sorted.map((r) => r.id).join(" → ");
     }
 
     case QUESTIONS.RATE: {
-      const rateAnswer = answer as RateAnswer;
-      const entries = Object.entries(rateAnswer.ratings);
+      const rated = typedAnswer(QUESTIONS.RATE, answer);
+      const entries = Object.entries(rated.ratings);
       if (entries.length === 0) return "no ratings";
       const sorted = entries.sort((a, b) => b[1] - a[1]);
       return sorted
         .slice(0, MAX_DISPLAYED_RATINGS)
-        .map(([k, v]) => `${k}: ${v}`)
+        .map(([k, rating]) => `${k}: ${rating}`)
         .join(", ");
     }
 
     case QUESTIONS.ASK_CODE:
-      return truncateText((answer as AskCodeAnswer).code);
+      return truncateText(typedAnswer(QUESTIONS.ASK_CODE, answer).code);
 
     case QUESTIONS.ASK_IMAGE:
     case QUESTIONS.ASK_FILE:
@@ -77,19 +64,16 @@ export function extractAnswerSummary(type: QuestionType, answer: Answer): string
     case QUESTIONS.SHOW_DIFF:
     case QUESTIONS.SHOW_PLAN:
     case QUESTIONS.REVIEW_SECTION: {
-      const reviewAnswer = answer as ReviewAnswer;
-      return reviewAnswer.feedback
-        ? `${reviewAnswer.decision}: ${truncateText(reviewAnswer.feedback)}`
-        : reviewAnswer.decision;
+      const review = typedAnswer(QUESTIONS.REVIEW_SECTION, answer);
+      return review.feedback ? `${review.decision}: ${truncateText(review.feedback)}` : review.decision;
     }
 
     case QUESTIONS.SHOW_OPTIONS: {
-      const optAnswer = answer as ShowOptionsAnswer;
-      return optAnswer.feedback ? `${optAnswer.selected}: ${truncateText(optAnswer.feedback)}` : optAnswer.selected;
+      const option = typedAnswer(QUESTIONS.SHOW_OPTIONS, answer);
+      return option.feedback ? `${option.selected}: ${truncateText(option.feedback)}` : option.selected;
     }
 
     default: {
-      // Exhaustiveness check - if we get here, we missed a case
       const _exhaustive: never = type;
       return String(_exhaustive);
     }

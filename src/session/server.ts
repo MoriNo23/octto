@@ -1,9 +1,14 @@
 import type { Server, ServerWebSocket } from "bun";
 
+import * as v from "valibot";
+
 import { getHtmlBundle } from "@/ui";
 
 import type { SessionStore } from "./sessions";
-import type { WsClientMessage } from "./types";
+import { type WsClientMessage, WsClientMessageSchema } from "./types";
+
+const HTTP_BAD_REQUEST = 400;
+const HTTP_NOT_FOUND = 404;
 
 interface WsData {
   sessionId: string;
@@ -24,7 +29,7 @@ function handleFetch(
     if (success) {
       return undefined;
     }
-    return new Response("WebSocket upgrade failed", { status: 400 });
+    return new Response("WebSocket upgrade failed", { status: HTTP_BAD_REQUEST });
   }
 
   if (url.pathname === "/" || url.pathname === "/index.html") {
@@ -35,7 +40,7 @@ function handleFetch(
     });
   }
 
-  return new Response("Not Found", { status: 404 });
+  return new Response("Not Found", { status: HTTP_NOT_FOUND });
 }
 
 function handleWsOpen(ws: ServerWebSocket<WsData>, store: SessionStore): void {
@@ -53,7 +58,19 @@ function handleWsMessage(ws: ServerWebSocket<WsData>, message: string | Buffer, 
 
   let parsed: WsClientMessage;
   try {
-    parsed = JSON.parse(message.toString()) as WsClientMessage;
+    const raw: unknown = JSON.parse(message.toString());
+    const parseResult = v.safeParse(WsClientMessageSchema, raw);
+    if (!parseResult.success) {
+      ws.send(
+        JSON.stringify({
+          type: "error",
+          error: "Invalid message format",
+          details: parseResult.issues.map((i) => i.message).join(", "),
+        }),
+      );
+      return;
+    }
+    parsed = parseResult.output as WsClientMessage;
   } catch (error: unknown) {
     console.error("[octto] Failed to parse WebSocket message:", error);
     ws.send(

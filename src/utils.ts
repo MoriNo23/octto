@@ -1,14 +1,12 @@
-// src/tools/utils.ts
-
 const ID_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 const ID_LENGTH = 8;
 
 function generateId(prefix: string): string {
-  let result = `${prefix}_`;
+  let id = `${prefix}_`;
   for (let i = 0; i < ID_LENGTH; i++) {
-    result += ID_CHARS.charAt(Math.floor(Math.random() * ID_CHARS.length));
+    id += ID_CHARS.charAt(Math.floor(Math.random() * ID_CHARS.length));
   }
-  return result;
+  return id;
 }
 
 export function generateSessionId(): string {

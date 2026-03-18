@@ -1,4 +1,3 @@
-// src/state/store.ts
 import type { Answer } from "@/session";
 
 import { createStatePersistence } from "./persistence";

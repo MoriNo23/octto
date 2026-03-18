@@ -1,6 +1,8 @@
 // tests/tools/brainstorm.test.ts
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { createSessionStore } from "../../src/session/sessions";
 import { createBrainstormTools } from "../../src/tools/brainstorm";
@@ -8,14 +10,16 @@ import { createBrainstormTools } from "../../src/tools/brainstorm";
 describe("Brainstorm Tools", () => {
   let sessions: ReturnType<typeof createSessionStore>;
   let tools: ReturnType<typeof createBrainstormTools>;
+  let tempDir: string;
 
   beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "octto-brainstorm-test-"));
     sessions = createSessionStore({ skipBrowser: true });
-    tools = createBrainstormTools(sessions);
+    tools = createBrainstormTools(sessions, undefined as any, tempDir);
   });
 
   afterEach(() => {
-    rmSync(".octto", { recursive: true, force: true });
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
   describe("create_brainstorm", () => {

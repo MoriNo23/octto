@@ -1,21 +1,22 @@
 // tests/state/state-store.test.ts
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { createStateStore, type StateStore } from "../../src/state/store";
 
-const TEST_DIR = "/tmp/octto-state-store-test";
-
 describe("createStateStore", () => {
   let stateStore: StateStore;
+  let testDir: string;
 
   beforeEach(() => {
-    rmSync(TEST_DIR, { recursive: true, force: true });
-    stateStore = createStateStore(TEST_DIR);
+    testDir = mkdtempSync(join(tmpdir(), "octto-state-store-test-"));
+    stateStore = createStateStore(testDir);
   });
 
   afterEach(() => {
-    rmSync(TEST_DIR, { recursive: true, force: true });
+    rmSync(testDir, { recursive: true, force: true });
   });
 
   describe("createSession", () => {
@@ -124,6 +125,54 @@ describe("createStateStore", () => {
       await stateStore.completeBranch("ses_allcomplete", "branch1", "Done");
 
       expect(await stateStore.isSessionComplete("ses_allcomplete")).toBe(true);
+    });
+  });
+
+  describe("error paths", () => {
+    it("should throw 'Session not found' when addQuestionToBranch targets non-existent session", async () => {
+      await expect(
+        stateStore.addQuestionToBranch("ses_nonexistent", "branch1", {
+          id: "q_err1",
+          type: "ask_text",
+          text: "Question?",
+          config: { question: "Question?" },
+        }),
+      ).rejects.toThrow("Session not found");
+    });
+
+    it("should throw 'Branch not found' when addQuestionToBranch targets non-existent branch", async () => {
+      await stateStore.createSession("ses_err_branch", "Test", [{ id: "branch1", scope: "Scope" }]);
+
+      await expect(
+        stateStore.addQuestionToBranch("ses_err_branch", "nonexistent_branch", {
+          id: "q_err2",
+          type: "ask_text",
+          text: "Question?",
+          config: { question: "Question?" },
+        }),
+      ).rejects.toThrow("Branch not found");
+    });
+
+    it("should throw 'Question not found' when recordAnswer targets non-existent question", async () => {
+      await stateStore.createSession("ses_err_answer", "Test", [{ id: "branch1", scope: "Scope" }]);
+
+      await expect(stateStore.recordAnswer("ses_err_answer", "q_nonexistent", { text: "Answer" })).rejects.toThrow(
+        "Question not found",
+      );
+    });
+
+    it("should throw 'Branch not found' when completeBranch targets non-existent branch", async () => {
+      await stateStore.createSession("ses_err_complete", "Test", [{ id: "branch1", scope: "Scope" }]);
+
+      await expect(stateStore.completeBranch("ses_err_complete", "nonexistent_branch", "Finding")).rejects.toThrow(
+        "Branch not found",
+      );
+    });
+
+    it("should throw 'Session not found' when setBrowserSessionId targets non-existent session", async () => {
+      await expect(stateStore.setBrowserSessionId("ses_nonexistent", "browser_123")).rejects.toThrow(
+        "Session not found",
+      );
     });
   });
 

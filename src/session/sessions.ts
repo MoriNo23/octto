@@ -1,7 +1,7 @@
 import type { ServerWebSocket } from "bun";
 
 import { DEFAULT_ANSWER_TIMEOUT_MS } from "@/constants";
-import { generateQuestionId, generateSessionId } from "@/tools/utils";
+import { generateQuestionId, generateSessionId } from "@/utils";
 
 import { openBrowser } from "./browser";
 import { createServer } from "./server";

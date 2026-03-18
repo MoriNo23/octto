@@ -1,4 +1,3 @@
-// src/tools/responses.ts
 import { tool } from "@opencode-ai/plugin/tool";
 
 import { type SessionStore, STATUSES } from "@/session";
@@ -20,29 +19,29 @@ NOTE: Prefer get_next_answer for better flow - it returns whichever question use
         .describe("Max milliseconds to wait if blocking (default: 300000 = 5 min)"),
     },
     execute: async (args) => {
-      const result = await sessions.getAnswer({
+      const answer = await sessions.getAnswer({
         question_id: args.question_id,
         block: args.block,
         timeout: args.timeout,
       });
 
-      if (result.completed) {
+      if (answer.completed) {
         return `## Answer Received
 
-**Status:** ${result.status}
+**Status:** ${answer.status}
 
 **Response:**
 \`\`\`json
-${JSON.stringify(result.response, null, 2)}
+${JSON.stringify(answer.response, null, 2)}
 \`\`\``;
       }
 
       return `## Waiting for Answer
 
-**Status:** ${result.status}
-**Reason:** ${result.reason}
+**Status:** ${answer.status}
+**Reason:** ${answer.reason}
 
-${result.status === STATUSES.PENDING ? "User has not answered yet. Call again with block=true to wait." : ""}`;
+${answer.status === STATUSES.PENDING ? "User has not answered yet. Call again with block=true to wait." : ""}`;
     },
   });
 }
@@ -61,26 +60,26 @@ Push multiple questions, then call this repeatedly to get answers as they come.`
         .describe("Max milliseconds to wait if blocking (default: 300000 = 5 min)"),
     },
     execute: async (args) => {
-      const result = await sessions.getNextAnswer({
+      const nextAnswer = await sessions.getNextAnswer({
         session_id: args.session_id,
         block: args.block,
         timeout: args.timeout,
       });
 
-      if (result.completed) {
+      if (nextAnswer.completed) {
         return `## Answer Received
 
-**Question ID:** ${result.question_id}
-**Question Type:** ${result.question_type}
-**Status:** ${result.status}
+**Question ID:** ${nextAnswer.question_id}
+**Question Type:** ${nextAnswer.question_type}
+**Status:** ${nextAnswer.status}
 
 **Response:**
 \`\`\`json
-${JSON.stringify(result.response, null, 2)}
+${JSON.stringify(nextAnswer.response, null, 2)}
 \`\`\``;
       }
 
-      if (result.status === STATUSES.NONE_PENDING) {
+      if (nextAnswer.status === STATUSES.NONE_PENDING) {
         return `## No Pending Questions
 
 All questions have been answered or there are no questions in the queue.
@@ -89,8 +88,8 @@ Push more questions or end the session.`;
 
       return `## Waiting for Answer
 
-**Status:** ${result.status}
-${result.reason === STATUSES.TIMEOUT ? "Timed out waiting for response." : "No answer yet."}`;
+**Status:** ${nextAnswer.status}
+${nextAnswer.reason === STATUSES.TIMEOUT ? "Timed out waiting for response." : "No answer yet."}`;
     },
   });
 }
@@ -102,9 +101,9 @@ function buildListQuestions(sessions: SessionStore): OcttoTool {
       session_id: tool.schema.string().optional().describe("Session ID (omit for all sessions)"),
     },
     execute: async (args) => {
-      const result = sessions.listQuestions(args.session_id);
+      const listing = sessions.listQuestions(args.session_id);
 
-      if (result.questions.length === 0) {
+      if (listing.questions.length === 0) {
         return "No questions found.";
       }
 
@@ -112,7 +111,7 @@ function buildListQuestions(sessions: SessionStore): OcttoTool {
       output += "| ID | Type | Status | Created | Answered |\n";
       output += "|----|------|--------|---------|----------|\n";
 
-      for (const q of result.questions) {
+      for (const q of listing.questions) {
         output += `| ${q.id} | ${q.type} | ${q.status} | ${q.createdAt} | ${q.answeredAt || "-"} |\n`;
       }
 
@@ -129,8 +128,8 @@ The question will be removed from the user's queue.`,
       question_id: tool.schema.string().describe("Question ID to cancel"),
     },
     execute: async (args) => {
-      const result = sessions.cancelQuestion(args.question_id);
-      if (result.ok) {
+      const cancellation = sessions.cancelQuestion(args.question_id);
+      if (cancellation.ok) {
         return `Question ${args.question_id} cancelled.`;
       }
       return `Could not cancel question ${args.question_id}. It may already be answered or not exist.`;

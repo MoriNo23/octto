@@ -1,17 +1,16 @@
-// src/tools/brainstorm.ts
 import { tool } from "@opencode-ai/plugin/tool";
 
-import type { Answer, ReviewAnswer, SessionStore } from "@/session";
+import { DEFAULT_ANSWER_TIMEOUT_MS } from "@/constants";
+import type { Answer, SessionStore } from "@/session";
 import { QUESTION_TYPES, QUESTIONS, STATUSES } from "@/session";
 import { BRANCH_STATUSES, type BrainstormState, createStateStore, type StateStore } from "@/state";
+import { generateSessionId } from "@/utils";
 
 import { formatBranchStatus, formatFindings, formatFindingsList, formatQASummary } from "./formatters";
 import { processAnswer } from "./processor";
 import type { OcttoTool, OcttoTools, OpencodeClient } from "./types";
-import { generateSessionId } from "./utils";
 
 const MAX_ITERATIONS = 50;
-const ANSWER_TIMEOUT_MS = 300_000;
 const REVIEW_TIMEOUT_MS = 600_000;
 
 const branchesSchema = tool.schema
@@ -29,8 +28,6 @@ const branchesSchema = tool.schema
     }),
   )
   .describe("Branches to explore");
-
-// --- Extracted helper functions ---
 
 interface CollectionResult {
   state: BrainstormState | null;
@@ -66,8 +63,21 @@ async function flushPending(pending: Promise<void>[]): Promise<void> {
   pending.length = 0;
 }
 
+interface PendingAnswer {
+  completed: boolean;
+  status?: string;
+  question_id?: string;
+  response?: unknown;
+}
+
+function isCompletedWithAnswer(
+  answer: PendingAnswer,
+): answer is PendingAnswer & { completed: true; question_id: string; response: Answer } {
+  return answer.completed && typeof answer.question_id === "string" && answer.response !== undefined;
+}
+
 async function processOneAnswer(
-  answer: { completed: boolean; status?: string; question_id?: string; response?: unknown },
+  answer: PendingAnswer,
   pending: Promise<void>[],
   stateStore: StateStore,
   sessions: SessionStore,
@@ -80,15 +90,14 @@ async function processOneAnswer(
     return answer.status === STATUSES.TIMEOUT ? "break" : "continue";
   }
 
-  const { question_id, response } = answer;
-  if (question_id && response !== undefined) {
+  if (isCompletedWithAnswer(answer)) {
     enqueueAnswerProcessing(
       stateStore,
       sessions,
       sessionId,
       browserSessionId,
-      question_id,
-      response as Answer,
+      answer.question_id,
+      answer.response,
       client,
       pending,
     );
@@ -111,7 +120,7 @@ async function collectAnswers(
     const answer = await sessions.getNextAnswer({
       session_id: browserSessionId,
       block: true,
-      timeout: ANSWER_TIMEOUT_MS,
+      timeout: DEFAULT_ANSWER_TIMEOUT_MS,
     });
 
     const action = await processOneAnswer(answer, pending, stateStore, sessions, sessionId, browserSessionId, client);
@@ -158,25 +167,26 @@ interface ReviewResult {
   feedback: string;
 }
 
+function isReviewResponse(value: unknown): value is { decision: string; feedback?: string } {
+  return typeof value === "object" && value !== null && "decision" in value;
+}
+
 async function waitForReviewApproval(sessions: SessionStore, browserSessionId: string): Promise<ReviewResult> {
-  const result = await sessions.getNextAnswer({
+  const reviewAnswer = await sessions.getNextAnswer({
     session_id: browserSessionId,
     block: true,
     timeout: REVIEW_TIMEOUT_MS,
   });
 
-  if (!result.completed || !result.response) {
+  if (!reviewAnswer.completed || !isReviewResponse(reviewAnswer.response)) {
     return { approved: false, feedback: "" };
   }
 
-  const response = result.response as ReviewAnswer;
   return {
-    approved: response.decision === "approve",
-    feedback: response.feedback ?? "",
+    approved: reviewAnswer.response.decision === "approve",
+    feedback: reviewAnswer.response.feedback ?? "",
   };
 }
-
-// --- Format functions ---
 
 function formatInProgressResult(state: BrainstormState): string {
   const branches = state.branch_order.map((id) => formatBranchStatus(state.branches[id])).join("\n");
@@ -211,8 +221,6 @@ function formatCompletionResult(state: BrainstormState, approved: boolean, feedb
   <next_action>${nextAction}</next_action>
 </brainstorm_complete>`;
 }
-
-// --- Tool definitions ---
 
 interface BranchInput {
   id: string;
@@ -369,7 +377,8 @@ This is the recommended way to run a brainstorm - just create_brainstorm then aw
           question: "Review Design Plan",
           sections,
         });
-      } catch {
+      } catch (_error: unknown) {
+        // Expected when the browser session has already ended
         return formatSkippedReviewResult(state);
       }
 
@@ -379,8 +388,8 @@ This is the recommended way to run a brainstorm - just create_brainstorm then aw
   });
 }
 
-export function createBrainstormTools(sessions: SessionStore, client: OpencodeClient): OcttoTools {
-  const store = createStateStore();
+export function createBrainstormTools(sessions: SessionStore, client: OpencodeClient, baseDir?: string): OcttoTools {
+  const store = createStateStore(baseDir);
 
   return {
     create_brainstorm: buildCreateBrainstormTool(store, sessions),

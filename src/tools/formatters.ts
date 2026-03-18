@@ -1,5 +1,3 @@
-// src/tools/formatters.ts
-
 import type { Answer } from "@/session";
 import type { BrainstormState, Branch, BranchQuestion } from "@/state";
 

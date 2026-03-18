@@ -1,5 +1,3 @@
-// src/tools/factory.ts
-
 import { tool } from "@opencode-ai/plugin/tool";
 
 import type { BaseConfig, QuestionType, SessionStore } from "@/session";
@@ -16,6 +14,7 @@ interface QuestionToolConfig<T> {
   toConfig: (args: T) => BaseConfig;
 }
 
+// Return type inferred to preserve generic parameter T across call sites
 export function createQuestionToolFactory(sessions: SessionStore) {
   return function createQuestionTool<T extends { session_id: string }>(config: QuestionToolConfig<T>): OcttoTool {
     return tool({
@@ -26,14 +25,15 @@ Returns immediately with question_id. Use get_answer to retrieve response.`,
         ...config.args,
       },
       execute: async (args) => {
+        // zod schema types from tool() don't carry generic T, so the cast is unavoidable
         const validationError = config.validate?.(args as unknown as T);
         if (validationError) return `Failed: ${validationError}`;
 
         try {
           const questionConfig = config.toConfig(args as unknown as T);
-          const result = sessions.pushQuestion(args.session_id, config.type, questionConfig);
-          return `Question pushed: ${result.question_id}\nUse get_answer("${result.question_id}") to retrieve response.`;
-        } catch (error) {
+          const pushed = sessions.pushQuestion(args.session_id, config.type, questionConfig);
+          return `Question pushed: ${pushed.question_id}\nUse get_answer("${pushed.question_id}") to retrieve response.`;
+        } catch (error: unknown) {
           return `Failed: ${error instanceof Error ? error.message : String(error)}`;
         }
       },
@@ -70,11 +70,11 @@ The question will appear in the browser for the user to answer.`,
     },
     execute: async (args) => {
       try {
-        const result = sessions.pushQuestion(args.session_id, args.type, args.config);
-        return `Question pushed: ${result.question_id}
+        const pushed = sessions.pushQuestion(args.session_id, args.type, args.config);
+        return `Question pushed: ${pushed.question_id}
 Type: ${args.type}
 Use get_next_answer(session_id, block=true) to wait for the user's response.`;
-      } catch (error) {
+      } catch (error: unknown) {
         return `Failed to push question: ${error instanceof Error ? error.message : String(error)}`;
       }
     },

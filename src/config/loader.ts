@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { AgentConfig } from "@opencode-ai/sdk";
 import * as v from "valibot";
 
-import { AGENTS } from "@/agents";
+import { AGENTS, type AgentName, isAgentName } from "@/agents";
 
 import { AgentOverrideSchema, type Fragments, MAX_PORT, type OcttoConfig, OcttoConfigSchema } from "./schema";
 
@@ -42,13 +42,13 @@ function formatValidationErrors(issues: v.BaseIssue<unknown>[]): string {
     .join("\n");
 }
 
-function salvageValidAgents(parsed: object): OcttoConfig | null {
+function salvageValidAgents(parsed: Record<string, unknown>): OcttoConfig | null {
   if (!("agents" in parsed)) {
     console.warn("[octto] No valid agents found in config, using defaults");
     return null;
   }
 
-  const rawAgents = (parsed as { agents: unknown }).agents;
+  const rawAgents = parsed.agents;
   if (typeof rawAgents !== "object" || rawAgents === null) {
     console.warn("[octto] Invalid agents format, using defaults");
     return null;
@@ -57,15 +57,15 @@ function salvageValidAgents(parsed: object): OcttoConfig | null {
   const validAgents: OcttoConfig["agents"] = {};
   let hasValidAgent = false;
 
-  for (const [name, override] of Object.entries(rawAgents)) {
-    if (!VALID_AGENT_NAMES.includes(name as AGENTS)) {
+  for (const [name, override] of Object.entries(rawAgents as Record<string, unknown>)) {
+    if (!isAgentName(name)) {
       console.warn(`[octto] Unknown agent "${name}" - valid names: ${VALID_AGENT_NAMES.join(", ")}`);
       continue;
     }
 
     const agentResult = v.safeParse(AgentOverrideSchema, override);
     if (agentResult.success) {
-      validAgents[name as AGENTS] = agentResult.output;
+      validAgents[name] = agentResult.output;
       hasValidAgent = true;
     } else {
       console.warn(`[octto] Invalid config for agent "${name}":`);
@@ -90,28 +90,29 @@ async function load(configDir?: string): Promise<OcttoConfig | null> {
   try {
     const content = await readFile(configPath, "utf-8");
     parsed = JSON.parse(content);
-  } catch {
+  } catch (_error: unknown) {
+    /* config file not found or unreadable */
     return null;
   }
 
-  const result = v.safeParse(OcttoConfigSchema, parsed);
-  if (result.success) {
-    return result.output;
+  const configValidation = v.safeParse(OcttoConfigSchema, parsed);
+  if (configValidation.success) {
+    return configValidation.output;
   }
 
   console.warn(`[octto] Config validation errors in ${configPath}:`);
-  console.warn(formatValidationErrors(result.issues));
+  console.warn(formatValidationErrors(configValidation.issues));
 
   if (typeof parsed !== "object" || parsed === null) {
     console.warn("[octto] No valid agents found in config, using defaults");
     return null;
   }
 
-  return salvageValidAgents(parsed);
+  return salvageValidAgents(parsed as Record<string, unknown>);
 }
 
 export interface CustomConfig {
-  agents: Record<AGENTS, AgentConfig>;
+  agents: Record<AgentName, AgentConfig>;
   port: number;
   fragments: Fragments;
 }
@@ -120,14 +121,16 @@ export interface CustomConfig {
  * Load user configuration and merge with plugin agents.
  * Returns merged agent configs with user overrides applied, and resolved port.
  */
-export async function loadCustomConfig(agents: Record<AGENTS, AgentConfig>, configDir?: string): Promise<CustomConfig> {
+export async function loadCustomConfig(
+  agents: Record<AgentName, AgentConfig>,
+  configDir?: string,
+): Promise<CustomConfig> {
   const config = await load(configDir);
 
   const mergedAgents = { ...agents };
-  if (config?.agents) {
-    for (const [name, override] of Object.entries(config.agents)) {
-      mergedAgents[name as AGENTS] = { ...agents[name as AGENTS], ...override };
-    }
+  for (const [name, override] of Object.entries(config?.agents ?? {})) {
+    if (!isAgentName(name)) continue;
+    mergedAgents[name] = { ...agents[name], ...override };
   }
 
   return {

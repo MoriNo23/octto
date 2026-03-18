@@ -85,12 +85,15 @@ describe("mergeFragments", () => {
 
 describe("loadProjectFragments", () => {
   let tempDir: string;
+  let warnSpy: ReturnType<typeof spyOn>;
 
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "octto-test-"));
+    warnSpy = spyOn(console, "warn").mockImplementation(() => {});
   });
 
   afterEach(async () => {
+    warnSpy.mockRestore();
     await rm(tempDir, { recursive: true });
   });
 
@@ -127,6 +130,7 @@ describe("loadProjectFragments", () => {
 
     const result = await loadProjectFragments(tempDir);
     expect(result).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Invalid fragments.json schema"));
   });
 });
 

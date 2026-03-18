@@ -1,10 +1,9 @@
-// src/hooks/fragment-injector.ts
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import * as v from "valibot";
 
-import { AGENTS } from "@/agents";
+import { AGENTS, isAgentName } from "@/agents";
 
 type FragmentsRecord = Record<string, string[]> | undefined;
 
@@ -30,22 +29,19 @@ export function formatFragmentsBlock(fragments: string[] | undefined): string {
  * Global fragments come first, project fragments append.
  */
 export function mergeFragments(global: FragmentsRecord, project: FragmentsRecord): Record<string, string[]> {
-  const result: Record<string, string[]> = {};
+  const merged: Record<string, string[]> = {};
 
   for (const [agent, frags] of Object.entries(global ?? {})) {
-    result[agent] = [...frags];
+    merged[agent] = [...frags];
   }
 
   for (const [agent, frags] of Object.entries(project ?? {})) {
-    result[agent] = [...(result[agent] ?? []), ...frags];
+    merged[agent] = [...(merged[agent] ?? []), ...frags];
   }
 
-  return result;
+  return merged;
 }
 
-/**
- * Load project-level fragments from .octto/fragments.json
- */
 export async function loadProjectFragments(projectDir: string): Promise<Record<string, string[]> | undefined> {
   const fragmentsPath = join(projectDir, ".octto", "fragments.json");
 
@@ -53,22 +49,20 @@ export async function loadProjectFragments(projectDir: string): Promise<Record<s
     const content = await readFile(fragmentsPath, "utf-8");
     const parsed: unknown = JSON.parse(content);
 
-    const result = v.safeParse(ProjectFragmentsSchema, parsed);
-    if (!result.success) {
+    const fragmentsValidation = v.safeParse(ProjectFragmentsSchema, parsed);
+    if (!fragmentsValidation.success) {
       console.warn(`[octto] Invalid fragments.json schema in ${fragmentsPath}`);
       return undefined;
     }
 
-    return result.output;
-  } catch {
+    return fragmentsValidation.output;
+  } catch (_error: unknown) {
+    /* missing fragments.json is expected for projects without custom fragments */
     return undefined;
   }
 }
 
-/**
- * Calculate Levenshtein distance between two strings.
- * Used for suggesting similar agent names for typos.
- */
+/* Used for suggesting similar agent names on typos */
 /* eslint-disable max-depth, sonarjs/cognitive-complexity */
 export function levenshteinDistance(a: string, b: string): number {
   if (a.length === 0) return b.length;
@@ -117,7 +111,7 @@ export function warnUnknownAgents(fragments: Record<string, string[]> | undefine
   if (!fragments) return;
 
   for (const agentName of Object.keys(fragments)) {
-    if (VALID_AGENT_NAMES.includes(agentName as AGENTS)) {
+    if (isAgentName(agentName)) {
       continue;
     }
 
@@ -136,10 +130,6 @@ export interface FragmentInjectorContext {
   projectDir: string;
 }
 
-/**
- * Create a fragment injector that can modify agent system prompts.
- * Returns merged fragments from global config and project config.
- */
 export async function createFragmentInjector(
   ctx: FragmentInjectorContext,
   globalFragments: FragmentsRecord,
@@ -154,9 +144,6 @@ export async function createFragmentInjector(
   return merged;
 }
 
-/**
- * Get the system prompt prefix for a specific agent.
- */
 export function getAgentSystemPromptPrefix(fragments: Record<string, string[]>, agentName: string): string {
   return formatFragmentsBlock(fragments[agentName]);
 }

@@ -1,5 +1,6 @@
-// Session and Question types for the octto plugin
 import type { ServerWebSocket } from "bun";
+
+import * as v from "valibot";
 
 import type {
   AskCodeConfig,
@@ -64,8 +65,6 @@ export const QUESTIONS = {
 
 export type QuestionType = (typeof QUESTIONS)[keyof typeof QUESTIONS];
 export const QUESTION_TYPES = Object.values(QUESTIONS);
-
-// --- Answer Types ---
 
 export interface PickOneAnswer {
   selected: string;
@@ -265,7 +264,6 @@ export interface ListQuestionsOutput {
   }>;
 }
 
-// WebSocket message types
 export const WS_MESSAGES = {
   QUESTION: "question",
   CANCEL: "cancel",
@@ -302,3 +300,8 @@ export interface WsConnectedMessage {
 
 export type WsServerMessage = WsQuestionMessage | WsCancelMessage | WsEndMessage;
 export type WsClientMessage = WsResponseMessage | WsConnectedMessage;
+
+export const WsClientMessageSchema = v.variant("type", [
+  v.object({ type: v.literal("response"), id: v.string(), answer: v.any() }),
+  v.object({ type: v.literal("connected") }),
+]);

@@ -1,23 +1,22 @@
-// src/tools/session.ts
 import { tool } from "@opencode-ai/plugin/tool";
 
 import type { SessionStore } from "@/session";
 
 import type { OcttoTool, OcttoTools } from "./types";
 
-function formatSessionStarted(result: { session_id: string; url: string; question_ids?: string[] }): string {
+function formatSessionStarted(session: { session_id: string; url: string; question_ids?: string[] }): string {
   let output = `## Session Started
 
 | Field | Value |
 |-------|-------|
-| Session ID | ${result.session_id} |
-| URL | ${result.url} |
+| Session ID | ${session.session_id} |
+| URL | ${session.url} |
 `;
 
-  if (result.question_ids && result.question_ids.length > 0) {
-    output += `| Questions | ${result.question_ids.length} loaded |\n\n`;
-    output += `**Question IDs:** ${result.question_ids.join(", ")}\n\n`;
-    output += `Browser opened with ${result.question_ids.length} questions ready.\n`;
+  if (session.question_ids && session.question_ids.length > 0) {
+    output += `| Questions | ${session.question_ids.length} loaded |\n\n`;
+    output += `**Question IDs:** ${session.question_ids.join(", ")}\n\n`;
+    output += `Browser opened with ${session.question_ids.length} questions ready.\n`;
     output += `Use get_next_answer(session_id, block=true) to get answers as user responds.`;
   } else {
     output += `\nBrowser opened. Use question tools to push questions.`;
@@ -74,9 +73,9 @@ REQUIRED: You MUST provide at least 1 question. Will fail without questions.`,
       }
 
       try {
-        const result = await sessions.startSession({ title: args.title, questions: args.questions });
-        return formatSessionStarted(result);
-      } catch (error) {
+        const session = await sessions.startSession({ title: args.title, questions: args.questions });
+        return formatSessionStarted(session);
+      } catch (error: unknown) {
         return `Failed to start session: ${error instanceof Error ? error.message : String(error)}`;
       }
     },
@@ -91,8 +90,8 @@ Closes the browser window and cleans up resources.`,
       session_id: tool.schema.string().describe("Session ID to end"),
     },
     execute: async (args) => {
-      const result = await sessions.endSession(args.session_id);
-      if (result.ok) {
+      const ended = await sessions.endSession(args.session_id);
+      if (ended.ok) {
         return `Session ${args.session_id} ended successfully.`;
       }
       return `Failed to end session ${args.session_id}. It may not exist.`;

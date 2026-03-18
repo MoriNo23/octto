@@ -1,4 +1,3 @@
-// src/tools/questions.ts
 import { tool } from "@opencode-ai/plugin/tool";
 
 import type { SessionStore } from "@/session";

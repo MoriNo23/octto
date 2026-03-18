@@ -15,10 +15,10 @@ export const AgentOverrideSchema = v.partial(
 
 export const PortSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(MAX_PORT));
 
-export const FragmentsSchema = v.optional(v.record(v.enum(AGENTS), v.array(v.string())));
+export const FragmentsSchema = v.optional(v.record(v.picklist(Object.values(AGENTS)), v.array(v.string())));
 
 export const OcttoConfigSchema = v.object({
-  agents: v.optional(v.record(v.enum(AGENTS), AgentOverrideSchema)),
+  agents: v.optional(v.record(v.picklist(Object.values(AGENTS)), AgentOverrideSchema)),
   port: v.optional(PortSchema),
   fragments: FragmentsSchema,
 });
