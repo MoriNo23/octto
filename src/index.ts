@@ -4,8 +4,8 @@ import { AGENTS, agents } from "@/agents";
 import { loadCustomConfig } from "@/config";
 import { createFragmentInjector, getAgentSystemPromptPrefix, warnUnknownAgents } from "@/hooks";
 import { createSessionStore } from "@/session";
+import type { OcttoTool } from "@/tools";
 import { createOcttoTools } from "@/tools";
-import type { OcttoTool } from "@/tools/types";
 
 function wrapWithTracking(tool: OcttoTool, tracked: Map<string, Set<string>>): void {
   const originalExecute = tool.execute;

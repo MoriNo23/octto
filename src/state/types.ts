@@ -8,30 +8,30 @@ export const BRANCH_STATUSES = {
 export type BranchStatus = (typeof BRANCH_STATUSES)[keyof typeof BRANCH_STATUSES];
 
 export interface BranchQuestion {
-  id: string;
-  type: QuestionType;
-  text: string;
-  config: BaseConfig;
+  readonly id: string;
+  readonly type: QuestionType;
+  readonly text: string;
+  readonly config: BaseConfig;
   answer?: Answer;
   answeredAt?: number;
 }
 
 export interface Branch {
-  id: string;
-  scope: string;
+  readonly id: string;
+  readonly scope: string;
   status: BranchStatus;
   questions: BranchQuestion[];
   finding: string | null;
 }
 
 export interface BrainstormState {
-  session_id: string;
+  readonly session_id: string;
   browser_session_id: string | null;
-  request: string;
-  created_at: number;
+  readonly request: string;
+  readonly created_at: number;
   updated_at: number;
   branches: Record<string, Branch>;
-  branch_order: string[];
+  readonly branch_order: string[];
 }
 
 export interface CreateBranchInput {

@@ -32,12 +32,12 @@ export const STATUSES = {
 export type QuestionStatus = (typeof STATUSES)[Exclude<keyof typeof STATUSES, "NONE_PENDING">];
 
 export interface Question {
-  id: string;
-  sessionId: string;
-  type: QuestionType;
-  config: BaseConfig;
+  readonly id: string;
+  readonly sessionId: string;
+  readonly type: QuestionType;
+  readonly config: BaseConfig;
   status: QuestionStatus;
-  createdAt: Date;
+  readonly createdAt: Date;
   answeredAt?: Date;
   response?: Answer;
   /** True if this answer was already returned via get_next_answer */
@@ -187,11 +187,11 @@ export type BaseConfig =
     };
 
 export interface Session {
-  id: string;
-  title?: string;
-  port: number;
-  url: string;
-  createdAt: Date;
+  readonly id: string;
+  readonly title?: string;
+  readonly port: number;
+  readonly url: string;
+  readonly createdAt: Date;
   questions: Map<string, Question>;
   wsConnected: boolean;
   server?: ReturnType<typeof Bun.serve>;
