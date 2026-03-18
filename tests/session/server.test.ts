@@ -1,5 +1,5 @@
 // tests/session/server.test.ts
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 
 import { createSessionStore, type SessionStore } from "../../src/session/sessions";
 
@@ -37,16 +37,13 @@ describe("Server WebSocket error handling", () => {
     await ready;
 
     // Suppress expected console.error from the invalid JSON parse
-    const originalError = console.error;
-    console.error = () => {};
-    try {
-      ws.send("not valid json {{{");
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+    ws.send("not valid json {{{");
 
-      // Wait for error response
-      await new Promise<void>((resolve) => setTimeout(resolve, 200));
-    } finally {
-      console.error = originalError;
-    }
+    // Wait for error response
+    await new Promise<void>((resolve) => setTimeout(resolve, 200));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("[octto]"), expect.anything());
+    errorSpy.mockRestore();
 
     // Close WS before cleanup
     ws.close();
@@ -55,7 +52,7 @@ describe("Server WebSocket error handling", () => {
     const errorMessages = messages.filter((m) => {
       try {
         return JSON.parse(m).type === "error";
-      } catch {
+      } catch (_error: unknown) {
         return false;
       }
     });
@@ -93,7 +90,7 @@ describe("Server WebSocket error handling", () => {
     const errorMessages = messages.filter((m) => {
       try {
         return JSON.parse(m).type === "error";
-      } catch {
+      } catch (_error: unknown) {
         return false;
       }
     });
